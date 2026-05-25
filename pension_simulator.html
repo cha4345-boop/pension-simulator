@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>연금 시뮬레이터</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background:#f5f5f3; color:#1a1a1a; font-size:15px; line-height:1.6; min-height:100vh; }
+  .wrap { max-width:980px; margin:0 auto; padding:2rem 1.25rem 4rem; }
+  h1 { font-size:20px; font-weight:500; margin-bottom:4px; }
+  .subtitle { font-size:13px; color:#666; margin-bottom:1.75rem; }
+
+  .ctrl-box { background:#fff; border:0.5px solid #e0e0dc; border-radius:12px; padding:20px; margin-bottom:1.5rem; }
+  .ctrl-grid { display:grid; grid-template-columns:1fr 1px 1fr; gap:20px; }
+  @media(max-width:640px){ .ctrl-grid { grid-template-columns:1fr; } .divider { display:none; } }
+  .divider { background:#e0e0dc; }
+  .ctrl-sep { height:0.5px; background:#e0e0dc; margin:18px 0; }
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media(max-width:640px){ .two-col { grid-template-columns:1fr; } }
+
+  .section-label { font-size:11px; font-weight:500; color:#888; margin-bottom:10px; letter-spacing:.03em; text-transform:uppercase; }
+  .ctrl-col { display:flex; flex-direction:column; gap:10px; }
+  .field { display:flex; flex-direction:column; gap:3px; }
+  .field label { font-size:12px; color:#666; }
+  .field-pair { display:flex; flex-direction:column; gap:6px; padding:8px 10px; background:#fafaf8; border:0.5px solid #e8e8e4; border-radius:8px; }
+  .field-pair .field-title { font-size:11px; font-weight:500; color:#666; }
+  .input-row { display:flex; align-items:center; gap:6px; }
+  .input-row input[type=number] { width:90px; padding:6px 8px; text-align:right; border:0.5px solid #ccc; border-radius:6px; font-size:13px; background:#fff; color:#1a1a1a; outline:none; transition:border-color .15s; }
+  .input-row input[type=number]:focus { border-color:#3478d4; }
+  .input-suffix { font-size:12px; color:#888; }
+  .sub-label { font-size:11px; color:#999; }
+
+  .rate-wrap { display:flex; flex-direction:column; gap:4px; }
+  .rate-slider-row { display:flex; align-items:center; gap:8px; }
+  input[type=range] { flex:1; -webkit-appearance:none; appearance:none; height:4px; background:#e0e0dc; border-radius:2px; outline:none; cursor:pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:#3478d4; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+  input[type=range]::-moz-range-thumb { width:14px; height:14px; border:none; border-radius:50%; background:#3478d4; cursor:pointer; }
+  .rate-num-wrap { display:flex; align-items:center; gap:3px; }
+  .rate-num { width:52px; padding:5px 6px; text-align:right; border:0.5px solid #ccc; border-radius:6px; font-size:13px; background:#fafaf8; color:#1a1a1a; outline:none; transition:border-color .15s; }
+  .rate-num:focus { border-color:#3478d4; }
+  .rate-ticks { display:flex; justify-content:space-between; padding:0 1px; }
+  .rate-ticks span { font-size:10px; color:#bbb; }
+
+  .totals { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .chip { display:inline-flex; align-items:center; gap:5px; background:#f0f0ec; border:0.5px solid #ddd; border-radius:6px; padding:4px 10px; font-size:12px; color:#666; }
+  .chip strong { font-weight:500; color:#1a1a1a; }
+  .chip.retire { background:#f5f0ff; border-color:#d5c8f0; } .chip.retire strong { color:#6a1ab1; }
+  .chip.np     { background:#edfaf4; border-color:#b8e5cc; } .chip.np strong     { color:#1a7a4a; }
+
+  .section-note { font-size:11px; color:#999; margin-top:8px; line-height:1.6; padding:6px 10px; border-radius:6px; }
+  .note-purple { background:#f8f6ff; border:0.5px solid #e0d8f8; }
+  .note-teal   { background:#f0faf6; border:0.5px solid #c8e8da; }
+
+  /* 지표 */
+  .metric-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(148px,1fr)); gap:10px; margin-bottom:1.5rem; }
+  .mc { background:#fff; border:0.5px solid #e0e0dc; border-radius:10px; padding:14px; }
+  .ml { font-size:12px; color:#888; margin-bottom:4px; }
+  .mv { font-size:17px; font-weight:500; color:#1a1a1a; }
+  .ms { font-size:11px; color:#aaa; margin-top:3px; }
+
+  /* 수입 분석 카드 */
+  .income-card { background:#fff; border:0.5px solid #e0e0dc; border-radius:12px; padding:18px; margin-bottom:1.5rem; }
+  .income-card h3 { font-size:13px; font-weight:500; color:#1a1a1a; margin-bottom:14px; }
+  .income-phases { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media(max-width:620px){ .income-phases { grid-template-columns:1fr; } }
+  .phase-block { border:0.5px solid #e8e8e4; border-radius:8px; padding:12px; }
+  .phase-block.highlight { border-color:#b8e5cc; background:#f7fdf9; }
+  .phase-title { font-size:11px; font-weight:600; color:#888; margin-bottom:8px; letter-spacing:.03em; }
+  .phase-title.green { color:#1a7a4a; }
+  .income-row { display:flex; justify-content:space-between; align-items:baseline; font-size:12px; padding:2px 0; }
+  .income-row .lbl { color:#666; }
+  .income-row .val { font-weight:500; color:#1a1a1a; }
+  .income-row .val.green { color:#1a7a4a; }
+  .income-row .val.red   { color:#c0392b; }
+  .income-row .val.warn  { color:#c47c00; }
+  .income-row .val.blue  { color:#1a56c4; }
+  .income-sep { height:0.5px; background:#e8e8e4; margin:6px 0; }
+  .income-total { display:flex; justify-content:space-between; align-items:baseline; font-size:13px; font-weight:600; padding:4px 0 2px; }
+  .income-delta { font-size:11px; color:#1a7a4a; font-weight:500; margin-top:4px; }
+  .fn-block { margin-top:14px; padding-top:12px; border-top:0.5px solid #e8e8e4; }
+  .fn-block h4 { font-size:11px; font-weight:600; color:#888; margin-bottom:6px; letter-spacing:.03em; }
+  .fn-item { font-size:11px; color:#888; line-height:1.8; }
+  .fn-item .tag { display:inline-block; background:#f0f0ec; border:0.5px solid #ddd; border-radius:4px; padding:0 5px; font-size:10px; font-weight:500; color:#666; margin-right:3px; }
+  .fn-item .tag.warn { background:#fff3cd; border-color:#f5c97a; color:#856404; }
+  .fn-item .tag.green { background:#edfaf4; border-color:#b8e5cc; color:#1a7a4a; }
+
+  /* 차트·범례 */
+  .legend { display:flex; gap:14px; margin-bottom:8px; font-size:12px; color:#888; flex-wrap:wrap; }
+  .legend span { display:flex; align-items:center; gap:5px; }
+  .ldot { width:10px; height:10px; border-radius:2px; display:inline-block; }
+  .chart-wrap { background:#fff; border:0.5px solid #e0e0dc; border-radius:12px; padding:16px; margin-bottom:1.5rem; }
+  .chart-inner { position:relative; width:100%; height:240px; }
+
+  /* 테이블 */
+  .table-wrap { background:#fff; border:0.5px solid #e0e0dc; border-radius:12px; overflow:hidden; }
+  .table-scroll { max-height:520px; overflow-y:auto; overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  thead { position:sticky; top:0; background:#fff; z-index:1; }
+  th { font-size:10.5px; font-weight:500; color:#888; padding:9px 9px; border-bottom:0.5px solid #e8e8e4; text-align:right; white-space:nowrap; }
+  th.l, td.l { text-align:left; }
+  td { padding:6px 9px; border-bottom:0.5px solid #f0f0ec; text-align:right; white-space:nowrap; color:#1a1a1a; }
+  tr:last-child td { border-bottom:none; }
+  tr.dt  td { background:rgba(106,26,177,.04); }
+  tr.nps td { background:rgba(26,122,74,.03); }
+  tr.dx  td { color:#c0392b; }
+  tr.ex-tax td.col-tax { color:#c47c00 !important; font-weight:500; }
+  tr:hover td { background:#fafaf8; }
+  tr.dt:hover td  { background:rgba(106,26,177,.07); }
+  tr.nps:hover td { background:rgba(26,122,74,.06); }
+
+  .pill { display:inline-block; font-size:10px; padding:2px 6px; border-radius:20px; font-weight:500; }
+  .pill-a  { background:#e8f0fc; color:#1a56c4; }
+  .pill-w  { background:#e6f4ee; color:#1a7a4a; }
+  .pill-x  { background:#fdecea; color:#c0392b; }
+  .pill-hi { background:#fff3cd; color:#856404; }
+  .pill-r  { background:#f0e8fc; color:#6a1ab1; }
+  .pill-n  { background:#d4f5e5; color:#1a7a4a; }
+
+  .foot { font-size:11px; color:#aaa; margin-top:12px; line-height:1.8; }
+  .foot .hl  { color:#c47c00; }
+  .foot .hlp { color:#6a1ab1; }
+  .foot .hln { color:#1a7a4a; }
+  .cwarn { color:#c47c00; } .cretire { color:#6a1ab1; } .cnp { color:#1a7a4a; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🗂️ 연금 시뮬레이터</h1>
+  <p class="subtitle">연금저축 + IRP + 퇴직금 IRP + 국민연금 → 55세 은퇴 기준 연도별 잔액·세금·실수령액 시뮬레이션</p>
+
+  <div class="ctrl-box">
+    <!-- ① 납입 + 수익률 -->
+    <div class="ctrl-grid">
+      <div class="ctrl-col">
+        <div class="section-label">월 납입금액 (적립기)</div>
+        <div class="field"><label>연금저축 (본인)</label><div class="input-row"><input type="number" id="iPS" value="50" min="0" max="300" step="1" oninput="updateTotals()"><span class="input-suffix">만원/월</span></div></div>
+        <div class="field"><label>IRP (본인)</label><div class="input-row"><input type="number" id="iIRP" value="30" min="0" max="300" step="1" oninput="updateTotals()"><span class="input-suffix">만원/월</span></div></div>
+        <div class="field"><label>연금저축 (배우자)</label><div class="input-row"><input type="number" id="iPSS" value="50" min="0" max="300" step="1" oninput="updateTotals()"><span class="input-suffix">만원/월</span></div></div>
+        <div class="field"><label>IRP (배우자)</label><div class="input-row"><input type="number" id="iIRPS" value="30" min="0" max="300" step="1" oninput="updateTotals()"><span class="input-suffix">만원/월</span></div></div>
+        <div class="totals">
+          <div class="chip">본인 <strong id="tP">80만원</strong></div>
+          <div class="chip">배우자 <strong id="tS">80만원</strong></div>
+          <div class="chip">합계 <strong id="tT">160만원</strong></div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="ctrl-col">
+        <div class="section-label">수익률 / 수령 설정</div>
+        <div class="field"><label>적립기 연수익률</label>
+          <div class="rate-wrap">
+            <div class="rate-slider-row">
+              <input type="range" id="rA" min="1" max="20" step="0.5" value="10" oninput="syncRate('A')">
+              <div class="rate-num-wrap"><input type="number" class="rate-num" id="nA" value="10" min="1" max="20" step="0.5" oninput="syncRate('A',true)"><span class="input-suffix">%</span></div>
+            </div>
+            <div class="rate-ticks"><span>1%</span><span>5%</span><span>10%</span><span>15%</span><span>20%</span></div>
+          </div>
+        </div>
+        <div class="field"><label>수령기 연수익률</label>
+          <div class="rate-wrap">
+            <div class="rate-slider-row">
+              <input type="range" id="rW" min="0" max="10" step="0.5" value="4" oninput="syncRate('W')">
+              <div class="rate-num-wrap"><input type="number" class="rate-num" id="nW" value="4" min="0" max="10" step="0.5" oninput="syncRate('W',true)"><span class="input-suffix">%</span></div>
+            </div>
+            <div class="rate-ticks"><span>0%</span><span>2.5%</span><span>5%</span><span>7.5%</span><span>10%</span></div>
+          </div>
+        </div>
+        <div class="field"><label>연금/IRP 월 인출 (본인) <span id="warnP" style="display:none;font-size:10px;color:#c47c00">⚠ 합산 연 1,200만 초과</span></label>
+          <div class="input-row"><input type="number" id="iWP" value="100" min="0" max="500" step="10" oninput="go()"><span class="input-suffix">만원/월</span></div>
+        </div>
+        <div class="field"><label>연금/IRP 월 인출 (배우자) <span id="warnS" style="display:none;font-size:10px;color:#c47c00">⚠ 합산 연 1,200만 초과</span></label>
+          <div class="input-row"><input type="number" id="iWS" value="100" min="0" max="500" step="10" oninput="go()"><span class="input-suffix">만원/월</span></div>
+        </div>
+        <div class="field"><label>보기 단위</label>
+          <select id="sV" onchange="go()" style="padding:6px 8px;border:0.5px solid #ccc;border-radius:6px;font-size:13px;background:#fafaf8;color:#1a1a1a;outline:none;cursor:pointer;width:100%;">
+            <option value="sep">개인별 (본인 기준)</option>
+            <option value="couple">부부 합산</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- ② 퇴직금 IRP -->
+    <div class="ctrl-sep"></div>
+    <div>
+      <div class="section-label">💼 55세 퇴직금 IRP (별도 계좌)</div>
+      <div class="two-col">
+        <!-- 본인 -->
+        <div class="field-pair">
+          <div class="field-title">본인</div>
+          <div class="field"><span class="sub-label">퇴직금 일시금</span>
+            <div class="input-row"><input type="number" id="iRP" value="0" min="0" max="100000" step="100" oninput="go()"><span class="input-suffix">만원</span></div>
+          </div>
+          <div class="field"><span class="sub-label">IRP 월 인출액</span>
+            <div class="input-row"><input type="number" id="iRWP" value="0" min="0" max="300" step="10" oninput="go()"><span class="input-suffix">만원/월</span></div>
+          </div>
+        </div>
+        <!-- 배우자 -->
+        <div class="field-pair">
+          <div class="field-title">배우자</div>
+          <div class="field"><span class="sub-label">퇴직금 일시금</span>
+            <div class="input-row"><input type="number" id="iRS" value="0" min="0" max="100000" step="100" oninput="go()"><span class="input-suffix">만원</span></div>
+          </div>
+          <div class="field"><span class="sub-label">IRP 월 인출액</span>
+            <div class="input-row"><input type="number" id="iRWS" value="0" min="0" max="300" step="10" oninput="go()"><span class="input-suffix">만원/월</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="totals">
+        <div class="chip retire">본인 퇴직금 <strong id="tRP">0원</strong></div>
+        <div class="chip retire">배우자 퇴직금 <strong id="tRS">0원</strong></div>
+      </div>
+      <div class="section-note note-purple">
+        퇴직금 IRP는 <b>연금/IRP와 별도 계좌</b>로 시뮬레이션됩니다. 세금은 연금/IRP 인출 + 퇴직금 IRP 인출 + 국민연금을 <b>1인당 합산</b>하여 1,200만원 초과 여부를 판단합니다.
+        (퇴직금의 실제 세율은 퇴직소득세 체계가 적용되므로 전문가 상담 권장)
+      </div>
+    </div>
+
+    <!-- ③ 국민연금 -->
+    <div class="ctrl-sep"></div>
+    <div>
+      <div class="section-label">🏛️ 국민연금 (65세 수령 개시)</div>
+      <div class="two-col">
+        <div class="field"><label>예상 국민연금 (본인)</label>
+          <div class="input-row"><input type="number" id="iNP" value="0" min="0" max="300" step="5" oninput="go()"><span class="input-suffix">만원/월</span></div>
+        </div>
+        <div class="field"><label>예상 국민연금 (배우자)</label>
+          <div class="input-row"><input type="number" id="iNS" value="0" min="0" max="300" step="5" oninput="go()"><span class="input-suffix">만원/월</span></div>
+        </div>
+      </div>
+      <div class="totals">
+        <div class="chip np">본인 <strong id="tNP">0원/월</strong></div>
+        <div class="chip np">배우자 <strong id="tNS">0원/월</strong></div>
+        <div class="chip np">합계 <strong id="tNT">0원/월</strong></div>
+      </div>
+      <div class="section-note note-teal">
+        국민연금은 65세부터 추가 수입으로 합산됩니다. 세금은 연금저축/IRP·퇴직금 IRP·국민연금 <b>모두 합산 후</b> 1,200만원 초과 여부를 판단합니다.
+      </div>
+    </div>
+  </div><!-- /ctrl-box -->
+
+  <!-- 지표 -->
+  <div id="met" class="metric-grid"></div>
+
+  <!-- 세후 수입 분석 카드 -->
+  <div id="incomeCard" class="income-card"></div>
+
+  <!-- 범례 + 차트 -->
+  <div class="legend">
+    <span><span class="ldot" style="background:#3478d4"></span>적립기</span>
+    <span><span class="ldot" style="background:#1d9e75"></span>수령기</span>
+    <span><span class="ldot" style="background:#27ae60"></span>국민연금 시작(65세~)</span>
+    <span><span class="ldot" style="background:#e24b4a"></span>고갈</span>
+    <span><span class="ldot" style="background:#9b59b6"></span>퇴직금 유입</span>
+  </div>
+  <div class="chart-wrap"><div class="chart-inner"><canvas id="ch"></canvas></div></div>
+
+  <!-- 테이블 -->
+  <div class="table-wrap">
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th class="l">연도</th><th class="l">나이</th><th class="l">단계</th>
+          <th id="colSav">연금/IRP 인출</th>
+          <th>퇴직금IRP 인출</th>
+          <th>국민연금</th>
+          <th>퇴직금 유입</th>
+          <th>세금</th>
+          <th>세후 합계</th>
+          <th>연말 잔액</th>
+        </tr></thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <p class="foot">
+    납입 기준: 현재 나이 42세 → 55세 은퇴 (13년 적립). 수익률은 미래 수익을 보장하지 않습니다.<br>
+    <span class="hl">연금소득세: 55~69세 5.5%, 70~79세 4.4%, 80세+ 3.3%. 1인당 연간 합산 1,200만원 초과분은 16.5% 분리과세.</span><br>
+    <span class="hlp">퇴직금 IRP: 연금 수령 시 퇴직소득세 30~40% 감면 혜택 (본 시뮬레이터는 동일 연금소득세율 적용, 실제는 전문가 상담 필요).</span><br>
+    <span class="hln">국민연금은 저축 고갈 후에도 계속 수령됩니다. 저축 소진 시점 이후 NP 수입은 본 시뮬레이터 표에서 제외됩니다.</span>
+  </p>
+</div>
+
+<script>
+let ch = null;
+const K   = n => Math.round(n).toLocaleString('ko-KR');
+const fmt = n => { const a=Math.abs(n); if(a>=1e8) return (n/1e8).toFixed(1)+'억'; if(a>=1e4) return Math.round(n/1e4).toLocaleString()+'만'; return K(n); };
+const gv  = id => parseFloat(document.getElementById(id).value)||0;
+const W   = n => (n/10000).toFixed(1)+'만'; // 만원 단위 간략 표시
+
+// ── 세율 ─────────────────────────────────────────────────────────────────────
+function pensionTaxRate(age){ return age>=80?.033:age>=70?.044:.055; }
+
+// perPersonAnnual: 연금저축/IRP + 퇴직금IRP + 국민연금 1인 합산 연간액
+function calcTax(perPersonAnnual, age){
+  if(perPersonAnnual<=0) return 0;
+  const r=pensionTaxRate(age), thr=12_000_000;
+  return perPersonAnnual<=thr ? perPersonAnnual*r : thr*r+(perPersonAnnual-thr)*0.165;
+}
+
+// ── 1인 시뮬레이션 ────────────────────────────────────────────────────────────
+// mc: 월 납입(원), mwSav: 연금/IRP 월 인출, mwRet: 퇴직금IRP 월 인출
+// lump: 55세 퇴직금 일시금, npM: 국민연금 월액
+function calcPerson(mc, mwSav, mwRet, aR, wR, lump, npM){
+  const ar=aR/100/12, wr=wR/100/12;
+  let balSav=0, balRet=0;
+  const rows=[];
+
+  // 적립기 42→54
+  for(let age=42;age<55;age++){
+    let ret=0,contrib=0;
+    for(let m=0;m<12;m++){
+      const i=balSav*ar; balSav+=i+mc; ret+=i; contrib+=mc;
+    }
+    rows.push({age,ph:'A',savDraw:contrib,retDraw:0,np:0,ret,balSav,balRet:0,tax:0,netTotal:0,excess:false,retireIn:0});
+  }
+
+  // 수령기 55→115
+  for(let age=55;age<=115;age++){
+    const retireIn=(age===55)?lump:0;
+    if(retireIn>0) balRet+=retireIn;
+
+    const npAnnual=(age>=65)?npM*12:0;
+    let drawSav=0,drawRet=0,ret=0;
+    for(let m=0;m<12;m++){
+      if(balSav>0){ const i=balSav*wr; balSav+=i; ret+=i; const w=Math.min(mwSav,balSav); balSav-=w; drawSav+=w; }
+      if(balRet>0){ const i=balRet*wr; balRet+=i; ret+=i; const w=Math.min(mwRet,balRet); balRet-=w; drawRet+=w; }
+      if(balSav<=0&&balRet<=0) break;
+    }
+    const totalPension=drawSav+drawRet+npAnnual;
+    const tax=calcTax(totalPension,age);
+    const excess=totalPension>12_000_000;
+    const netTotal=Math.max(0,totalPension-tax);
+    const ph=(balSav<=0&&balRet<=0)?'X':'W';
+    rows.push({age,ph,savDraw:drawSav,retDraw:drawRet,np:npAnnual,ret,balSav:Math.max(0,balSav),balRet:Math.max(0,balRet),tax,netTotal,excess,retireIn});
+    if(ph==='X') break;
+  }
+  return rows;
+}
+
+// ── 부부 합산 병합 ────────────────────────────────────────────────────────────
+function mergeRows(rP,rS){
+  const len=Math.max(rP.length,rS.length);
+  const zero={savDraw:0,retDraw:0,np:0,ret:0,balSav:0,balRet:0,tax:0,netTotal:0,excess:false,retireIn:0};
+  return Array.from({length:len},(_,i)=>{
+    const p=rP[i]||{...zero,age:(rS[i]||{age:55}).age,ph:'X'};
+    const s=rS[i]||{...zero,age:p.age,ph:'X'};
+    return {
+      age:p.age,
+      ph:(p.ph==='A'||s.ph==='A')?'A':(p.ph==='X'&&s.ph==='X')?'X':'W',
+      savDraw:p.savDraw+s.savDraw, retDraw:p.retDraw+s.retDraw,
+      np:p.np+s.np, ret:p.ret+s.ret,
+      balSav:p.balSav+s.balSav, balRet:p.balRet+s.balRet,
+      tax:p.tax+s.tax, netTotal:p.netTotal+s.netTotal,
+      excess:p.excess||s.excess, retireIn:p.retireIn+s.retireIn
+    };
+  });
+}
+
+// ── 슬라이더 ─────────────────────────────────────────────────────────────────
+function syncRate(id,fromNum){
+  const sl=document.getElementById('r'+id),nu=document.getElementById('n'+id);
+  if(fromNum){ let v=Math.min(Math.max(parseFloat(nu.value),+sl.min),+sl.max); nu.value=v; sl.value=v; }
+  else nu.value=sl.value;
+  go();
+}
+function updateTotals(){
+  const p=(gv('iPS')+gv('iIRP'))*10000, s=(gv('iPSS')+gv('iIRPS'))*10000;
+  document.getElementById('tP').textContent=fmt(p)+'원';
+  document.getElementById('tS').textContent=fmt(s)+'원';
+  document.getElementById('tT').textContent=fmt(p+s)+'원';
+  go();
+}
+
+// ── 세후 수입 분석 카드 ───────────────────────────────────────────────────────
+// 보기 단위(isCouple)와 무관하게 항상 본인·배우자 각각 독립 컬럼으로 표시
+function renderIncomeCard(mwSavP,mwRetP,npP,mwSavS,mwRetS,npS){
+  const hasNP=npP+npS>0;
+
+  // 1인당 연간 계산
+  function calc1(mwSav,mwRet,np,age){
+    const ann=(mwSav+mwRet+np)*12;
+    const tax=calcTax(ann,age);
+    const rate=pensionTaxRate(age);
+    const base=Math.min(ann,12_000_000);
+    const over=Math.max(0,ann-12_000_000);
+    return {mwSav,mwRet,np,ann,tax,net:ann-tax,rate,base,over,excess:ann>12_000_000};
+  }
+
+  // 55~64세 (국민연금 없음, 대표 나이 60세)
+  const P1=calc1(mwSavP,mwRetP,0,   60);
+  const S1=calc1(mwSavS,mwRetS,0,   60);
+  // 65세~ (국민연금 포함)
+  const P2=calc1(mwSavP,mwRetP,npP, 65);
+  const S2=calc1(mwSavS,mwRetS,npS, 65);
+
+  const hh1=(P1.net+S1.net)/12;   // 부부 세후 월 합계 55~64세
+  const hh2=(P2.net+S2.net)/12;   // 부부 세후 월 합계 65세~
+  const delta=hh2-hh1;
+
+  // 1인 컬럼 HTML 생성
+  function personCol(c, name, nameColor){
+    if(c.ann<=0) return `<div style="color:#bbb;font-size:12px;padding:4px 0">${name}: 입력 없음</div>`;
+    const rPct=(c.rate*100).toFixed(1);
+    let rows=`<div style="font-size:11px;font-weight:600;color:${nameColor};margin-bottom:6px;padding-bottom:4px;border-bottom:0.5px solid #e8e8e4">${name}</div>`;
+    if(c.mwSav>0) rows+=ir('연금/IRP',  `+${fmt(c.mwSav*12)}원/년`,'#1a1a1a');
+    if(c.mwRet>0) rows+=ir('퇴직금 IRP',`+${fmt(c.mwRet*12)}원/년`,'#6a1ab1');
+    if(c.np>0)    rows+=ir('국민연금',   `+${fmt(c.np*12)}원/년`,   '#1a7a4a');
+    rows+=`<div style="height:0.5px;background:#e8e8e4;margin:5px 0"></div>`;
+    rows+=ir('세전 소계', `${fmt(c.ann)}원/년`, '#555');
+    if(!c.excess){
+      rows+=ir(`세금 ${rPct}%`, `-${fmt(c.tax)}원/년`, '#c0392b');
+    } else {
+      rows+=ir(`세금 <span style="font-size:10px;background:#fff3cd;color:#856404;border-radius:3px;padding:1px 4px">1,200만 초과</span>`,`-${fmt(c.tax)}원/년`,'#c47c00');
+      rows+=`<div style="font-size:10px;color:#bbb;padding:1px 0 2px 8px">└ ${fmt(c.base)}×${rPct}% + ${fmt(c.over)}×16.5%</div>`;
+    }
+    rows+=`<div style="height:0.5px;background:#e8e8e4;margin:5px 0"></div>`;
+    rows+=ir('세후 연간',`${fmt(c.net)}원/년`, '#1a7a4a');
+    rows+=ir('세후 월간',`<b>${fmt(c.net/12)}원</b>`,  '#1a7a4a');
+    return rows;
+  }
+
+  function ir(lbl,val,color){
+    return `<div class="income-row"><span class="lbl">${lbl}</span><span class="val" style="color:${color}">${val}</span></div>`;
+  }
+
+  // 구간 블록 (2컬럼: 본인 | 배우자)
+  function phaseBlock(p,s,title,isHighlight,showDelta){
+    const hhNet=(p.net+s.net)/12;
+    const borderStyle=isHighlight?'border-color:#b8e5cc;background:#f7fdf9':'';
+    let h=`<div class="phase-block" style="${borderStyle}">`;
+    h+=`<div class="phase-title${isHighlight?' green':''}">${title}</div>`;
+    // 2컬럼
+    h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">`;
+    h+=`<div>${personCol(p,'본인','#1a56c4')}</div>`;
+    h+=`<div>${personCol(s,'배우자','#6a1ab1')}</div>`;
+    h+=`</div>`;
+    h+=`<div style="height:0.5px;background:#e0e0dc;margin:6px 0"></div>`;
+    h+=`<div class="income-total"><span>부부 세후 월 합계</span><span style="color:#1a1a1a;font-size:15px">${fmt(hhNet)}원</span></div>`;
+    if(showDelta&&delta>0) h+=`<div class="income-delta">▲ 국민연금 수령 후 +${fmt(delta)}원/월 증가</div>`;
+    h+=`</div>`;
+    return h;
+  }
+
+  // Footnote 동적 생성
+  function buildFootnote(p1,s1,p2,s2){
+    const lines=[];
+    const rPct=(pensionTaxRate(60)*100).toFixed(1);
+    lines.push(`<div class="fn-item"><span class="tag">연금소득세</span>55~69세 ${rPct}% / 70~79세 4.4% / 80세+ 3.3% (지방소득세 포함)</div>`);
+
+    // 구간1 과세 판단
+    const note1=[
+      p1.ann>0?`본인 ${fmt(p1.ann)}원/년${p1.excess?' <b style="color:#c47c00">[초과]</b>':''}`:null,
+      s1.ann>0?`배우자 ${fmt(s1.ann)}원/년${s1.excess?' <b style="color:#c47c00">[초과]</b>':''}`:null
+    ].filter(Boolean).join(' / ');
+    if(note1) lines.push(`<div class="fn-item"><span class="tag">55~64세</span>${note1}${(p1.excess||s1.excess)?' → 초과분 16.5% 분리과세':' → 전액 연금소득세'}</div>`);
+
+    if(hasNP){
+      const note2=[
+        p2.ann>0?`본인 ${fmt(p2.ann)}원/년 (국민연금 ${fmt(npP*12)}원 포함)${p2.excess?' <b style="color:#c47c00">[초과]</b>':''}`:null,
+        s2.ann>0?`배우자 ${fmt(s2.ann)}원/년 (국민연금 ${fmt(npS*12)}원 포함)${s2.excess?' <b style="color:#c47c00">[초과]</b>':''}`:null
+      ].filter(Boolean).join(' / ');
+      if(note2) lines.push(`<div class="fn-item"><span class="tag green">65세~</span>${note2}${(p2.excess||s2.excess)?' → 초과분 16.5% 분리과세':' → 전액 연금소득세'}</div>`);
+    }
+
+    lines.push(`<div class="fn-item"><span class="tag">부부 세금 합계</span>55~64세 월 평균 ${fmt((p1.tax+s1.tax)/12)}원${hasNP?` / 65세~ 월 평균 ${fmt((p2.tax+s2.tax)/12)}원`:''}</div>`);
+    return lines.join('');
+  }
+
+  let html=`<h3>💰 가정 세후 월 수입 분석</h3>`;
+  html+=`<div class="income-phases">`;
+  html+=phaseBlock(P1,S1,'55 ~ 64세 (국민연금 수령 전)',false,false);
+  if(hasNP){
+    html+=phaseBlock(P2,S2,'65세~ (국민연금 수령 후)',true,true);
+  } else {
+    html+=`<div class="phase-block" style="display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;color:#bbb;font-size:12px;min-height:80px">
+      <span style="font-size:20px">🏛️</span>
+      국민연금 금액을 입력하면<br>65세 이후 비교가 표시됩니다</div>`;
+  }
+  html+=`</div>`;
+  html+=`<div class="fn-block"><h4>📎 세금 산출 근거</h4><div>${buildFootnote(P1,S1,P2,S2)}</div></div>`;
+  document.getElementById('incomeCard').innerHTML=html;
+}
+
+// ── 메인 렌더 ────────────────────────────────────────────────────────────────
+function go(){
+  const aR=parseFloat(document.getElementById('nA').value)||10;
+  const wR=parseFloat(document.getElementById('nW').value)||4;
+  const view=document.getElementById('sV').value;
+  const isCouple=view==='couple';
+
+  const mcP=(gv('iPS')+gv('iIRP'))*10000,  mcS=(gv('iPSS')+gv('iIRPS'))*10000;
+  const mwSavP=gv('iWP')*10000,             mwSavS=gv('iWS')*10000;
+  const rpP=gv('iRP')*10000,                rpS=gv('iRS')*10000;
+  const mwRetP=gv('iRWP')*10000,            mwRetS=gv('iRWS')*10000;
+  const npP=gv('iNP')*10000,                npS=gv('iNS')*10000;
+
+  // 합산 경고 (연금/IRP + 퇴직금IRP + NP 기준)
+  const totalAnnP=(mwSavP+mwRetP)*12, totalAnnS=(mwSavS+mwRetS)*12;
+  document.getElementById('warnP').style.display=totalAnnP>12_000_000?'inline':'none';
+  document.getElementById('warnS').style.display=totalAnnS>12_000_000?'inline':'none';
+
+  // NP 칩 업데이트
+  document.getElementById('tNP').textContent=fmt(npP)+'원/월';
+  document.getElementById('tNS').textContent=fmt(npS)+'원/월';
+  document.getElementById('tNT').textContent=fmt(npP+npS)+'원/월';
+  document.getElementById('tRP').textContent=fmt(rpP)+'원';
+  document.getElementById('tRS').textContent=fmt(rpS)+'원';
+
+  // 1인 시뮬
+  const rowsP_raw=calcPerson(mcP,mwSavP,mwRetP,aR,wR,rpP,npP);
+  const rowsS_raw=calcPerson(mcS,mwSavS,mwRetS,aR,wR,rpS,npS);
+
+  // 보기 단위에 따라 합산 or 개인
+  let baseRows = isCouple ? mergeRows(rowsP_raw,rowsS_raw) : rowsP_raw;
+  const rows = baseRows.map(r=>({...r, yr:2026+(r.age-42), bal:r.balSav+r.balRet}));
+
+  const accR  = rows.filter(r=>r.ph==='A');
+  const retRow= accR[accR.length-1];
+  const xr    = rows.find(r=>r.ph==='X');
+  const totC  = accR.reduce((s,r)=>s+r.savDraw,0);
+  const totRet= rows.reduce((s,r)=>s+r.ret,0);
+  const totTax= rows.reduce((s,r)=>s+r.tax,0);
+  const rb    = retRow?.bal??0;
+  const lbl   = isCouple?'부부 합산':'본인';
+  const xi    = xr?`${xr.age}세 (${xr.yr}년)`:'100세 이후에도 유지';
+  const xiC   = xr?'#c0392b':'#1a7a4a';
+
+  // 55세 잔액 (퇴직금 유입 후)
+  const row55=rows.find(r=>r.age===55);
+  const bal55=row55?.bal??rb;
+
+  const lump=isCouple?rpP+rpS:rpP;
+  const hasRetire=lump>0;
+  const hasNP=(isCouple?npP+npS:npP)>0;
+
+  // 55세 기준 세후 월 수령 (연금/IRP + 퇴직금IRP, NP 미포함)
+  const netMonthP55=(mwSavP+mwRetP)>0 ? ((mwSavP+mwRetP)*12-calcTax((mwSavP+mwRetP)*12,55))/12 : 0;
+  const netMonthS55=(mwSavS+mwRetS)>0 ? ((mwSavS+mwRetS)*12-calcTax((mwSavS+mwRetS)*12,55))/12 : 0;
+  const mwNet=isCouple?netMonthP55+netMonthS55:netMonthP55;
+
+  // 65세 기준 세후 (NP 포함)
+  const netMonthP65=(mwSavP+mwRetP+npP)>0 ? ((mwSavP+mwRetP+npP)*12-calcTax((mwSavP+mwRetP+npP)*12,65))/12 : 0;
+  const netMonthS65=(mwSavS+mwRetS+npS)>0 ? ((mwSavS+mwRetS+npS)*12-calcTax((mwSavS+mwRetS+npS)*12,65))/12 : 0;
+  const mwNet65=isCouple?netMonthP65+netMonthS65:netMonthP65;
+
+  document.getElementById('colSav').textContent=isCouple?'연금/IRP 인출(합)':'연금/IRP 인출(본인)';
+
+  // 지표
+  const retireCard=hasRetire
+    ?`<div class="mc" style="border-color:#d5c8f0"><div class="ml cretire">55세 퇴직금 유입(${lbl})</div><div class="mv cretire">${fmt(lump)}원</div><div class="ms">유입 후 잔액 ${fmt(bal55)}원</div></div>`:'';
+  const npCard=hasNP
+    ?`<div class="mc" style="border-color:#b8e5cc"><div class="ml cnp">국민연금 65세~(${lbl})</div><div class="mv cnp">${fmt(isCouple?npP+npS:npP)}원<span style="font-size:13px">/월</span></div><div class="ms">세후 합계 월 +${fmt(mwNet65-mwNet)}원 증가</div></div>`:'';
+
+  // 배우자 카드 (개인 보기)
+  let spouseCard='';
+  if(!isCouple){
+    const xrS=rowsS_raw.find(r=>r.ph==='X');
+    const rbS=rowsS_raw.filter(r=>r.ph==='A').slice(-1)[0]?.bal??0;
+    const xiS=xrS?`${xrS.age}세 (${2026+(xrS.age-42)}년)`:'100세 이후 유지';
+    spouseCard=`<div class="mc"><div class="ml">배우자 잔액</div><div class="mv">${fmt(rbS+(rowsS_raw.find(r=>r.age===55)?.balRet??0))}원</div><div class="ms" style="color:${xrS?'#c0392b':'#1a7a4a'}">고갈: ${xiS}</div></div>`;
+  }
+
+  document.getElementById('met').innerHTML=`
+    <div class="mc"><div class="ml">은퇴 시점 적립액(${lbl})</div><div class="mv">${fmt(rb)}원</div><div class="ms">원금 ${fmt(totC)}원 + 수익 ${fmt(rb-totC)}원</div></div>
+    <div class="mc"><div class="ml">총 납입 원금(${lbl})</div><div class="mv">${fmt(totC)}원</div><div class="ms">월 ${fmt(isCouple?mcP+mcS:mcP)}원 × 13년</div></div>
+    ${retireCard}${npCard}
+    <div class="mc"><div class="ml" style="color:${xiC}">저축 고갈 시점</div><div class="mv" style="font-size:15px;color:${xiC}">${xi}</div><div class="ms">세후 월 ${fmt(mwNet)}원 수령 기준</div></div>
+    ${spouseCard}
+    <div class="mc"><div class="ml">전기간 투자수익</div><div class="mv">${fmt(totRet)}원</div><div class="ms">원금 대비 ${totC>0?Math.round(totRet/totC*100):0}%</div></div>
+    <div class="mc"><div class="ml cwarn">예상 납부 세금 합계</div><div class="mv cwarn">${fmt(totTax)}원</div><div class="ms">55세 세후 월 ${fmt(mwNet)}원</div></div>
+  `;
+
+  // 수입 분석 카드
+  renderIncomeCard(mwSavP,mwRetP,npP,mwSavS,mwRetS,npS);
+
+  // ── 차트 ────────────────────────────────────────────────────────────────
+  const bgColors=rows.map(r=>
+    r.ph==='A'?'#3478d4':r.ph==='X'?'#e24b4a':r.retireIn>0?'#9b59b6':r.age>=65?'#27ae60':'#1d9e75'
+  );
+  if(ch) ch.destroy();
+  ch=new Chart(document.getElementById('ch'),{
+    type:'bar',
+    data:{ labels:rows.map(r=>String(r.yr)), datasets:[{label:'연말잔액',data:rows.map(r=>Math.round(r.bal/10000)),backgroundColor:bgColors,borderRadius:2,borderSkipped:false}] },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{
+        const r=rows[c.dataIndex];
+        const ls=[`잔액: ${c.raw.toLocaleString()}만원`];
+        if(r.retireIn>0) ls.push(`퇴직금 유입: +${fmt(r.retireIn)}원`);
+        if(r.np>0)       ls.push(`국민연금: +${fmt(r.np)}원/년`);
+        if(r.retDraw>0)  ls.push(`퇴직금IRP 인출: -${fmt(r.retDraw)}원/년`);
+        return ls;
+      }}}},
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:9},color:'#888',maxRotation:45,maxTicksLimit:18}},
+        y:{grid:{color:'rgba(0,0,0,.05)'},ticks:{font:{size:10},color:'#888',callback:v=>v.toLocaleString()+'만'}}
+      }
+    }
+  });
+
+  // ── 테이블 ──────────────────────────────────────────────────────────────
+  document.getElementById('tb').innerHTML=rows.map(r=>{
+    const isRet=r.retireIn>0;
+    const cls=[isRet?'dt':(r.np>0?'nps':''),r.ph==='X'?'dx':'',r.excess?'ex-tax':''].filter(Boolean).join(' ');
+    let badge='';
+    if(r.ph==='A') badge='<span class="pill pill-a">적립</span>';
+    else if(r.ph==='X') badge='<span class="pill pill-x">고갈</span>';
+    else{ badge='<span class="pill pill-w">수령</span>'+(r.excess?' <span class="pill pill-hi">16.5%</span>':''); }
+    if(isRet) badge+=' <span class="pill pill-r">퇴직금</span>';
+    if(r.age===65) badge+=' <span class="pill pill-n">국민연금▶</span>';
+
+    const savCell=r.ph==='A'
+      ?`<td style="color:#1a56c4">+${K(Math.round(r.savDraw))}원</td>`
+      :(r.savDraw>0?`<td style="color:#c0392b">-${K(Math.round(r.savDraw))}원</td>`:`<td style="color:#bbb">—</td>`);
+    const retCell=r.retDraw>0?`<td style="color:#c0392b">-${K(Math.round(r.retDraw))}원</td>`:`<td style="color:#bbb">—</td>`;
+    const npCell=r.np>0?`<td style="color:#1a7a4a;font-weight:500">+${K(Math.round(r.np))}원</td>`:`<td style="color:#bbb">—</td>`;
+    const riCell=isRet?`<td style="color:#6a1ab1;font-weight:500">+${fmt(r.retireIn)}원</td>`:`<td style="color:#bbb">—</td>`;
+    const taxCell=r.ph==='A'?'<td class="col-tax" style="color:#bbb">—</td>':`<td class="col-tax" style="color:${r.excess?'#c47c00':'#888'}">-${K(Math.round(r.tax))}원</td>`;
+    const netCell=r.ph==='A'?'<td style="color:#bbb">—</td>':`<td style="color:#1a7a4a;font-weight:500">${K(Math.round(r.netTotal))}원</td>`;
+
+    return `<tr class="${cls}">
+      <td class="l">${r.yr}</td><td class="l">${r.age}세</td>
+      <td class="l" style="white-space:nowrap">${badge}</td>
+      ${savCell}${retCell}${npCell}${riCell}${taxCell}${netCell}
+      <td style="font-weight:500">${K(Math.round(r.bal))}원</td>
+    </tr>`;
+  }).join('');
+}
+
+updateTotals();
+</script>
+</body>
+</html>
