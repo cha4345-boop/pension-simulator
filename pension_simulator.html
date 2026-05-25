@@ -174,10 +174,7 @@
           <div class="input-row"><input type="number" id="iWS" value="100" min="0" max="500" step="10" oninput="go()"><span class="input-suffix">만원/월</span></div>
         </div>
         <div class="field"><label>보기 단위</label>
-          <select id="sV" onchange="go()" style="padding:6px 8px;border:0.5px solid #ccc;border-radius:6px;font-size:13px;background:#fafaf8;color:#1a1a1a;outline:none;cursor:pointer;width:100%;">
-            <option value="sep">개인별 (본인 기준)</option>
-            <option value="couple">부부 합산</option>
-          </select>
+          <div style="padding:6px 10px;border:0.5px solid #e0e0dc;border-radius:6px;font-size:13px;background:#f5f0ff;color:#6a1ab1;font-weight:500">부부 합산</div>
         </div>
       </div>
     </div>
@@ -532,8 +529,7 @@ function renderIncomeCard(mwSavP,mwRetP,npP,mwSavS,mwRetS,npS){
 function go(){
   const aR=parseFloat(document.getElementById('nA').value)||10;
   const wR=parseFloat(document.getElementById('nW').value)||4;
-  const view=document.getElementById('sV').value;
-  const isCouple=view==='couple';
+  const isCouple = true; // 부부 합산 고정
 
   const mcP=(gv('iPS')+gv('iIRP'))*10000,  mcS=(gv('iPSS')+gv('iIRPS'))*10000;
   const mwSavP=gv('iWP')*10000,             mwSavS=gv('iWS')*10000;
@@ -591,7 +587,7 @@ function go(){
   const netMonthS65=(mwSavS+mwRetS+npS)>0 ? ((mwSavS+mwRetS+npS)*12-calcTax((mwSavS+mwRetS+npS)*12,65))/12 : 0;
   const mwNet65=isCouple?netMonthP65+netMonthS65:netMonthP65;
 
-  document.getElementById('colSav').textContent=isCouple?'연금/IRP 인출(합)':'연금/IRP 인출(본인)';
+  document.getElementById('colSav').textContent='연금/IRP 인출(합산)';
 
   // 지표
   const retireCard=hasRetire
